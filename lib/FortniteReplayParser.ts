@@ -4,6 +4,7 @@ import { EventType } from "./enums/EvenType";
 import { HeaderType } from "./enums/HeaderType";
 import { HistoryType } from "./enums/HistoryType";
 import { PlayerType } from "./enums/PlayerType";
+import { EliminationNotParseableException } from "./exceptions/EliminationNotParseableException";
 import { Elimination } from "./models/Elimination";
 import { PlayerId } from "./models/PlayerId";
 import { ReplayHeader } from "./models/ReplayHeader";
@@ -154,7 +155,11 @@ export class FortniteReplayParser {
     const size = tempReplay.readUint32();
     const decryptedReplay = this.decryptBuffer(size);
     if (group === EventType.PLAYER_ELIMINATION) {
-      this.parseEliminationEvent(decryptedReplay, startTime);
+      try {
+        this.parseEliminationEvent(decryptedReplay, startTime);
+      } catch (e) {
+        console.log(e.message);
+      }
     }
     if (metaData === EventType.MATCH_STATS) {
       this.parseMatchStatsEvent(decryptedReplay);
@@ -185,8 +190,7 @@ export class FortniteReplayParser {
       } else if (this.header.branch == "++Fortnite+Main") {
         decryptedReplay.skip(45);
       } else {
-        console.log("Could not parse Elimination Event");
-        return;
+        throw new EliminationNotParseableException();
       }
       eliminated = new PlayerId("", decryptedReplay.readString(), true);
       eliminator = new PlayerId("", decryptedReplay.readString(), true);
@@ -201,7 +205,6 @@ export class FortniteReplayParser {
 
   private readPlayer(decryptedReplay: Replay) {
     const playerType = decryptedReplay.readByte();
-    console.log(playerType);
     if (playerType === PlayerType.NAMELESS_BOT) {
       return new PlayerId("Bot", "", false);
     } else if (playerType === PlayerType.NAMED_BOT) {

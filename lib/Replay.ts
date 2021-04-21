@@ -82,7 +82,6 @@ export class Replay {
         key: this.readString(),
         value: this.readUint32(),
       };
-      console.log(a);
       return a;
     });
   }
