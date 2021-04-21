@@ -1,0 +1,20 @@
+{
+  "name": "fn-replay-parser",
+  "version": "1.0.1",
+  "description": "Parse Fortnite replays",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {"build": "tsc"},
+  "dependencies": {
+    "crypto": "^1.0.1",
+    "fs": "^0.0.1-security",
+    "typescript": "^4.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.41"
+  },
+  "files": [
+    "/dist"
+  ]
+}
