@@ -1,8 +1,8 @@
 import { readFileSync } from "fs";
-import { ReplayParser } from "./index";
+import { FortniteReplayParser } from "./index";
 
 const file = readFileSync("path/to/my.replay");
-const parser = new ReplayParser(file);
+const parser = new FortniteReplayParser(file);
 
 parser.parse();
 

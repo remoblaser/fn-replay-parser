@@ -4,13 +4,13 @@ import { EventType } from "./enums/EvenType";
 import { HeaderType } from "./enums/HeaderType";
 import { HistoryType } from "./enums/HistoryType";
 import { PlayerType } from "./enums/PlayerType";
-import { Replay } from "./FortniteReplay";
 import { Elimination } from "./models/Elimination";
 import { PlayerId } from "./models/PlayerId";
 import { ReplayHeader } from "./models/ReplayHeader";
 import { ReplayMeta } from "./models/ReplayMeta";
 import { Stats } from "./models/Stats";
 import { TeamStats } from "./models/TeamStats";
+import { Replay } from "./Replay";
 
 const FILE_MAGIC_NUMBER = 480436863;
 const NETWORK_MAGIC_NUMBER = 754295101;
