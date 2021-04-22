@@ -2,6 +2,15 @@
   "name": "fn-replay-parser",
   "version": "1.1.0",
   "description": "Parse Fortnite replays",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/remoblaser/fn-replay-parser.git"
+  },
+  "author": {
+    "name": "Remo Blaser",
+    "email": "me@remoblaser.ch",
+    "organization": false
+  },
   "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
