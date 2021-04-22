@@ -157,7 +157,7 @@ export class FortniteReplayParser {
       try {
         this.parseEliminationEvent(decryptedReplay, startTime);
       } catch (e) {
-        console.log(e.message);
+        console.warn(e.message);
       }
     }
     if (metaData === EventType.MATCH_STATS) {
@@ -269,7 +269,6 @@ export class FortniteReplayParser {
     if (!meta || !meta.isEncrypted || !meta.encryptionKey) {
       return this.reader;
     }
-    console.log(meta.encryptionKey);
     const decipher = crypto.createDecipheriv(
       "aes-256-ecb",
       meta.encryptionKey,
