@@ -2,8 +2,6 @@
 
 Library to parse Fortnite replays.
 
-See example.ts.
-
 ```ts
 import { readFileSync } from "fs";
 import { FortniteReplayParser } from "fn-replay-parser";
