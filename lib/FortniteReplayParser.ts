@@ -1,75 +1,71 @@
 import crypto from "crypto";
+import { ContinousBinaryReader } from "./ContinousBinaryReader";
 import { ChunkType } from "./enums/ChunkType";
 import { EventType } from "./enums/EvenType";
 import { HeaderType } from "./enums/HeaderType";
 import { HistoryType } from "./enums/HistoryType";
 import { PlayerType } from "./enums/PlayerType";
 import { EliminationNotParseableException } from "./exceptions/EliminationNotParseableException";
+import { FortniteReplay } from "./FortniteReplay";
 import { Elimination } from "./models/Elimination";
 import { PlayerId } from "./models/PlayerId";
+import { PlayerStats } from "./models/PlayerStats";
 import { ReplayHeader } from "./models/ReplayHeader";
 import { ReplayMeta } from "./models/ReplayMeta";
-import { Stats } from "./models/Stats";
 import { TeamStats } from "./models/TeamStats";
-import { Replay } from "./Replay";
 
 const FILE_MAGIC_NUMBER = 480436863;
 const NETWORK_MAGIC_NUMBER = 754295101;
 
 export class FortniteReplayParser {
-  private replay: Replay;
-  private isEncrypted = false;
-  private encryptionKey?: Buffer;
-
-  replayMeta?: ReplayMeta;
-  header?: ReplayHeader;
-  teamStats: Array<TeamStats> = [];
-  matchStats: Array<Stats> = [];
-  eliminations: Array<Elimination> = [];
+  private reader: ContinousBinaryReader;
+  private fortniteReplay: FortniteReplay;
 
   constructor(file: Buffer) {
-    this.replay = new Replay(file);
+    this.reader = new ContinousBinaryReader(file);
+    this.fortniteReplay = new FortniteReplay();
   }
 
-  parse() {
-    const magic = this.replay.readUint32();
+  parse(): FortniteReplay {
+    const magic = this.reader.readUint32();
     if (magic !== FILE_MAGIC_NUMBER) {
       throw new Error("Invalid replay");
     }
 
-    const fileVersion = this.replay.readUint32();
-    const lengthInMs = this.replay.readUint32();
-    const networkVersion = this.replay.readUint32();
-    const changeList = this.replay.readUint32();
-    const friendlyName = this.replay.readString();
-    const isLive = this.replay.readBoolean();
+    const fileVersion = this.reader.readUint32();
+    const lengthInMs = this.reader.readUint32();
+    const networkVersion = this.reader.readUint32();
+    const changeList = this.reader.readUint32();
+    const friendlyName = this.reader.readString();
+    const isLive = this.reader.readBoolean();
 
     let timestamp = null;
     if (fileVersion >= HistoryType.HISTORY_RECORDED_TIMESTAMP) {
-      timestamp = this.replay.readUInt64();
+      timestamp = this.reader.readUInt64();
     }
 
     let isCompressed = false;
     if (fileVersion >= HistoryType.HISTORY_COMPRESSION) {
-      isCompressed = this.replay.readBoolean();
+      isCompressed = this.reader.readBoolean();
     }
-
+    let isEncrypted = false;
+    let encryptionKey = Buffer.alloc(0);
     if (fileVersion >= HistoryType.HISTORY_ENCRYPTION) {
-      this.isEncrypted = this.replay.readBoolean();
-      const encryptionKeySize = this.replay.readUint32();
-      this.encryptionKey = this.replay.readBytes(encryptionKeySize);
+      isEncrypted = this.reader.readBoolean();
+      const encryptionKeySize = this.reader.readUint32();
+      encryptionKey = this.reader.readBytes(encryptionKeySize);
     }
 
-    if (!isLive && this.isEncrypted && this.encryptionKey?.length === 0) {
+    if (!isLive && isEncrypted && encryptionKey.length === 0) {
       throw new Error("Replay is marked encrypted but has no key");
     }
-    if (isLive && this.isEncrypted) {
+    if (isLive && isEncrypted) {
       throw new Error(
         "Replay is marked encrypted but not yet marked as finished"
       );
     }
 
-    this.replayMeta = new ReplayMeta(
+    const meta = new ReplayMeta(
       fileVersion,
       lengthInMs,
       networkVersion,
@@ -78,19 +74,20 @@ export class FortniteReplayParser {
       isLive,
       timestamp,
       isCompressed,
-      this.isEncrypted,
-      this.encryptionKey
+      isEncrypted,
+      encryptionKey
     );
+    this.fortniteReplay.setReplayMeta(meta);
 
-    while (this.replay.bytePosition < this.replay.buffer.length) {
-      const chunkType = this.replay.readUint32();
-      const chunkSize = this.replay.readUint32();
-      const offset = this.replay.bytePosition;
+    while (this.reader.bytePosition < this.reader.buffer.length) {
+      const chunkType = this.reader.readUint32();
+      const chunkSize = this.reader.readUint32();
+      const offset = this.reader.bytePosition;
       switch (chunkType) {
         case ChunkType.CHECKPOINT:
           break;
         case ChunkType.EVENT:
-          this.parseEvent(this.replay);
+          this.parseEvent(this.reader);
           break;
         case ChunkType.REPLAYDATA:
           break;
@@ -98,39 +95,40 @@ export class FortniteReplayParser {
           this.parseHeader();
           break;
       }
-      this.replay.bytePosition = offset + chunkSize;
+      this.reader.bytePosition = offset + chunkSize;
     }
+
+    return this.fortniteReplay;
   }
 
   private parseHeader() {
-    const networkMagic = this.replay.readUint32();
+    const networkMagic = this.reader.readUint32();
     if (networkMagic !== NETWORK_MAGIC_NUMBER) {
       throw new Error("Invalid replay");
     }
-    const networkVersion = this.replay.readUint32();
-    const networkChecksum = this.replay.readUint32();
-    const engineNetworkVersion = this.replay.readUint32();
-    const gameNetworkProtocol = this.replay.readUint32();
+    const networkVersion = this.reader.readUint32();
+    const networkChecksum = this.reader.readUint32();
+    const engineNetworkVersion = this.reader.readUint32();
+    const gameNetworkProtocol = this.reader.readUint32();
 
     let guid = "";
     if (networkVersion > HeaderType.HISTORY_HEADER_GUID) {
-      guid = this.replay.readGuid();
+      guid = this.reader.readGuid();
     }
 
-    const major = this.replay.readUint16();
-    const minor = this.replay.readUint16();
-    const patch = this.replay.readUint16();
+    const major = this.reader.readUint16();
+    const minor = this.reader.readUint16();
+    const patch = this.reader.readUint16();
 
-    const changeList = this.replay.readUint32();
-    const branch = this.replay.readString();
-
-    const levelNamesAndTimes = this.replay
+    const changeList = this.reader.readUint32();
+    const branch = this.reader.readString();
+    const levelNamesAndTimes = this.reader
       .readTuple()
       .map((o) => ({ name: o.key, time: o.value }));
-    const flags = this.replay.readUint32();
-    const gameSpecificData = this.replay.readArray();
+    const flags = this.reader.readUint32();
+    this.reader.skipArray();
 
-    this.header = new ReplayHeader(
+    const header = new ReplayHeader(
       networkVersion,
       networkChecksum,
       engineNetworkVersion,
@@ -142,17 +140,18 @@ export class FortniteReplayParser {
       changeList,
       branch,
       levelNamesAndTimes,
-      flags,
-      gameSpecificData
+      flags
     );
+    this.fortniteReplay.setHeader(header);
   }
-  private parseEvent(tempReplay: Replay) {
-    const eventId = tempReplay.readString();
-    const group = tempReplay.readString();
-    const metaData = tempReplay.readString();
-    const startTime = tempReplay.readUint32();
-    const endTime = tempReplay.readUint32();
-    const size = tempReplay.readUint32();
+
+  private parseEvent(tempReader: ContinousBinaryReader) {
+    const eventId = tempReader.readString();
+    const group = tempReader.readString();
+    const metaData = tempReader.readString();
+    const startTime = tempReader.readUint32();
+    const endTime = tempReader.readUint32();
+    const size = tempReader.readUint32();
     const decryptedReplay = this.decryptBuffer(size);
     if (group === EventType.PLAYER_ELIMINATION) {
       try {
@@ -169,105 +168,116 @@ export class FortniteReplayParser {
     }
   }
 
-  private parseEliminationEvent(decryptedReplay: Replay, timestamp: number) {
-    if (!this.header || !this.header.version) return;
+  private parseEliminationEvent(
+    decryptedReader: ContinousBinaryReader,
+    timestamp: number
+  ) {
+    const header = this.fortniteReplay.header;
+    if (!header || !header.version) return;
     let eliminated;
     let eliminator;
     if (
-      this.header.engineNetworkVersion >= 11 &&
-      Number(this.header.version["major"]) >= 9
+      header.engineNetworkVersion >= 11 &&
+      Number(header.version["major"]) >= 9
     ) {
-      decryptedReplay.skip(85);
-      eliminated = this.readPlayer(decryptedReplay);
-      eliminator = this.readPlayer(decryptedReplay);
+      decryptedReader.skip(85);
+      eliminated = this.readPlayer(decryptedReader);
+      eliminator = this.readPlayer(decryptedReader);
     } else {
-      if (this.header.branch === "++Fortnite+Release-4.0") {
-        decryptedReplay.skip(12);
-      } else if (this.header.branch === "++Fortnite+Release-4.2") {
-        decryptedReplay.skip(40);
-      } else if (this.header.branch >= "++Fortnite+Release-4.3") {
-        decryptedReplay.skip(45);
-      } else if (this.header.branch == "++Fortnite+Main") {
-        decryptedReplay.skip(45);
+      if (header.branch === "++Fortnite+Release-4.0") {
+        decryptedReader.skip(12);
+      } else if (header.branch === "++Fortnite+Release-4.2") {
+        decryptedReader.skip(40);
+      } else if (header.branch >= "++Fortnite+Release-4.3") {
+        decryptedReader.skip(45);
+      } else if (header.branch == "++Fortnite+Main") {
+        decryptedReader.skip(45);
       } else {
         throw new EliminationNotParseableException();
       }
-      eliminated = new PlayerId("", decryptedReplay.readString(), true);
-      eliminator = new PlayerId("", decryptedReplay.readString(), true);
+      eliminated = new PlayerId("", decryptedReader.readString(), true);
+      eliminator = new PlayerId("", decryptedReader.readString(), true);
     }
-    const gunType = decryptedReplay.readByte();
-    const knocked = decryptedReplay.readUint32();
+    const gunType = decryptedReader.readByte();
+    const knocked = decryptedReader.readUint32();
 
-    this.eliminations.push(
-      new Elimination(eliminated, eliminator, gunType, timestamp, knocked === 1)
+    const elimination = new Elimination(
+      eliminated,
+      eliminator,
+      gunType,
+      timestamp,
+      knocked === 1
     );
+
+    this.fortniteReplay.addElimination(elimination);
   }
 
-  private readPlayer(decryptedReplay: Replay) {
-    const playerType = decryptedReplay.readByte();
+  private readPlayer(decryptedReader: ContinousBinaryReader) {
+    const playerType = decryptedReader.readByte();
     if (playerType === PlayerType.NAMELESS_BOT) {
       return new PlayerId("Bot", "", false);
     } else if (playerType === PlayerType.NAMED_BOT) {
-      return new PlayerId(decryptedReplay.readString(), "", false);
+      return new PlayerId(decryptedReader.readString(), "", false);
     } else {
-      decryptedReplay.skip(1);
-      return new PlayerId("", decryptedReplay.readGuid(), true);
+      decryptedReader.skip(1);
+      return new PlayerId("", decryptedReader.readGuid(), true);
     }
   }
 
-  private parseTeamStatsEvent(decryptedReplay: Replay) {
-    const unknown = decryptedReplay.readUint32();
-    const position = decryptedReplay.readUint32();
-    const totalPlayers = decryptedReplay.readUint32();
+  private parseTeamStatsEvent(decryptedReader: ContinousBinaryReader) {
+    const unknown = decryptedReader.readUint32();
+    const position = decryptedReader.readUint32();
+    const totalPlayers = decryptedReader.readUint32();
 
-    this.teamStats.push(new TeamStats(unknown, position, totalPlayers));
+    const teamStats = new TeamStats(unknown, position, totalPlayers);
+    this.fortniteReplay.addTeamStats(teamStats);
   }
 
-  private parseMatchStatsEvent(decryptedReplay: Replay) {
-    const unknown = decryptedReplay.readUint32();
-    const accuracy = decryptedReplay.readFloat32();
-    const assists = decryptedReplay.readUint32();
-    const eliminations = decryptedReplay.readUint32();
-    const weaponDamage = decryptedReplay.readUint32();
-    const otherDamage = decryptedReplay.readUint32();
-    const revives = decryptedReplay.readUint32();
-    const damageTaken = decryptedReplay.readUint32();
-    const damageStructures = decryptedReplay.readUint32();
-    const materialsGathered = decryptedReplay.readUint32();
-    const materialsUsed = decryptedReplay.readUint32();
-    const totalTraveled = decryptedReplay.readUint32();
+  private parseMatchStatsEvent(decryptedReader: ContinousBinaryReader) {
+    const unknown = decryptedReader.readUint32();
+    const accuracy = decryptedReader.readFloat32();
+    const assists = decryptedReader.readUint32();
+    const eliminations = decryptedReader.readUint32();
+    const weaponDamage = decryptedReader.readUint32();
+    const otherDamage = decryptedReader.readUint32();
+    const revives = decryptedReader.readUint32();
+    const damageTaken = decryptedReader.readUint32();
+    const damageStructures = decryptedReader.readUint32();
+    const materialsGathered = decryptedReader.readUint32();
+    const materialsUsed = decryptedReader.readUint32();
+    const totalTraveled = decryptedReader.readUint32();
 
-    this.matchStats.push(
-      new Stats(
-        unknown,
-        accuracy,
-        assists,
-        eliminations,
-        weaponDamage,
-        otherDamage,
-        revives,
-        damageTaken,
-        damageStructures,
-        materialsGathered,
-        materialsUsed,
-        totalTraveled
-      )
+    const playerStats = new PlayerStats(
+      unknown,
+      accuracy,
+      assists,
+      eliminations,
+      weaponDamage,
+      otherDamage,
+      revives,
+      damageTaken,
+      damageStructures,
+      materialsGathered,
+      materialsUsed,
+      totalTraveled
     );
+    this.fortniteReplay.addPlayerStats(playerStats);
   }
 
-  private parseCheckpoint(replay: Replay) {}
-
-  private parseReplayData(replay: Replay) {}
-
-  private decryptBuffer(size: number): Replay {
-    if (!this.isEncrypted || !this.encryptionKey) return this.replay;
+  private decryptBuffer(size: number): ContinousBinaryReader {
+    const meta = this.fortniteReplay.replayMeta;
+    if (!meta || !meta.isEncrypted || !meta.encryptionKey) {
+      return this.reader;
+    }
+    console.log(meta.encryptionKey);
     const decipher = crypto.createDecipheriv(
       "aes-256-ecb",
-      this.encryptionKey,
+      meta.encryptionKey,
       Buffer.alloc(0)
     );
-    const encryptedPart = this.replay.readBytes(size);
-    return new Replay(
+    const encryptedPart = this.reader.readBytes(size);
+
+    return new ContinousBinaryReader(
       Buffer.concat([decipher.update(encryptedPart), decipher.final()])
     );
   }

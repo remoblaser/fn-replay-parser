@@ -1,4 +1,4 @@
-export class Replay {
+export class ContinousBinaryReader {
   buffer: Buffer;
   bytePosition = 0;
 
@@ -89,6 +89,12 @@ export class Replay {
   readArray() {
     const length = this.readUint32();
     return Array(length).map((_) => this.readString());
+  }
+
+  skipArray() {
+    const length = this.readUint32();
+    console.log(length);
+    this.skip(length);
   }
 
   readString(): string {

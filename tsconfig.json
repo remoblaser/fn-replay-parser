@@ -12,6 +12,7 @@
   },
   "include": [
     "index.ts",
+    "example.ts",
     "lib/**/*"
   ]
 }

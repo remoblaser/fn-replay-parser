@@ -11,7 +11,7 @@ export class ReplayHeader {
   branch: string;
   levelNamesAndTimes: Array<{ name: string; time: number }>;
   flags: number;
-  gameSpecificData: Array<string>;
+  gameSpecificData?: Array<string>;
 
   constructor(
     networkVersion: number,
@@ -26,7 +26,7 @@ export class ReplayHeader {
     branch: string,
     levelNamesAndTimes: Array<{ name: string; time: number }>,
     flags: number,
-    gameSpecificData: Array<string>
+    gameSpecificData?: Array<string>
   ) {
     this.networkVersion = networkVersion;
     this.networkChecksum = networkChecksum;

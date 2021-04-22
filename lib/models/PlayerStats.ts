@@ -1,4 +1,4 @@
-export class Stats {
+export class PlayerStats {
   unknown: number;
   accuracy: number;
   assists: number;

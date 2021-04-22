@@ -11,11 +11,11 @@ import { FortniteReplayParser } from "fn-replay-parser";
 const file = readFileSync("path/to/my.replay");
 const parser = new FortniteReplayParser(file);
 
-parser.parse();
+const replay = parser.parse();
 
-console.log(parser.replayMeta);
-console.log(parser.header);
-console.log(parser.matchStats);
-console.log(parser.teamStats);
-console.log(parser.eliminations);
+console.log(replay.replayMeta);
+console.log(replay.header);
+console.log(replay.playerStats);
+console.log(replay.teamStats);
+console.log(replay.eliminations);
 ```

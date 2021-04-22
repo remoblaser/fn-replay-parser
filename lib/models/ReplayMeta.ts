@@ -8,7 +8,7 @@ export class ReplayMeta {
   timestamp: bigint | null;
   isCompressed: boolean;
   isEncrypted: boolean;
-  encryptionKey?: string;
+  encryptionKey: Buffer;
 
   constructor(
     fileVersion: number,
@@ -20,7 +20,7 @@ export class ReplayMeta {
     timestamp: bigint | null,
     isCompressed: boolean,
     isEncrypted: boolean,
-    encryptionKey?: Buffer
+    encryptionKey: Buffer
   ) {
     this.fileVersion = fileVersion;
     this.lenghtInMs = lenghtInMs;
@@ -31,6 +31,6 @@ export class ReplayMeta {
     this.timestamp = timestamp;
     this.isCompressed = isCompressed;
     this.isEncrypted = isEncrypted;
-    this.encryptionKey = encryptionKey?.toString("hex");
+    this.encryptionKey = encryptionKey;
   }
 }
